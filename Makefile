@@ -1,85 +1,99 @@
-APP_NAME=instrument-server
-VERSION=1.0.0
-BUILD_TIME=$(shell date +%Y-%m-%d_%H:%M:%S)
-BUILD_DIR=build
-MAIN_FILE=cmd/server/main.go
+# 配置
+APP_NAME := instrument-server
+VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "v0.0.0")
+BUILD_TIME := $(shell date -u '+%Y-%m-%d_%H:%M:%S')
+GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
-GOCMD=go
-GOBUILD=$(GOCMD) build
-GOTEST=$(GOCMD) test
-GOGET=$(GOCMD) get
-GOMOD=$(GOCMD) mod
+# 编译选项
+LDFLAGS := -s -w \
+	-X main.Version=$(VERSION) \
+	-X main.BuildTime=$(BUILD_TIME) \
+	-X main.GitCommit=$(GIT_COMMIT)
 
-LDFLAGS=-ldflags "-s -w -X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME)"
+# 目录
+BUILD_DIR := dist
+SRC := .
 
-.PHONY: all build clean test run deps lint docker help
+# 平台列表
+PLATFORMS := \
+	linux/amd64 \
+	linux/arm64 \
+	windows/amd64 \
+	darwin/amd64 \
+	darwin/arm64
 
-all: clean build
+.PHONY: all clean build-all $(PLATFORMS)
 
-## build: 编译项目
+# 默认构建所有平台
+all: clean build-all
+
+# 构建所有平台
+build-all: $(PLATFORMS)
+
+# 构建单个平台
+$(PLATFORMS):
+	$(eval GOOS := $(word 1,$(subst /, ,$@)))
+	$(eval GOARCH := $(word 2,$(subst /, ,$@)))
+	$(eval OUTPUT := $(BUILD_DIR)/$(APP_NAME)-$(GOOS)-$(GOARCH))
+	$(eval EXT := $(if $(filter windows,$(GOOS)),.exe,))
+	@echo "🔨 编译 $(GOOS)/$(GOARCH)..."
+	@mkdir -p $(BUILD_DIR)
+	@GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags="$(LDFLAGS)" -o $(OUTPUT)$(EXT) $(SRC)
+	@echo "   ✅ $(OUTPUT)$(EXT)"
+
+# 编译当前平台
 build:
-	@echo "编译 $(APP_NAME) v$(VERSION)..."
-	@mkdir -p $(BUILD_DIR)
-	$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(APP_NAME) $(MAIN_FILE)
-	@echo "编译完成: $(BUILD_DIR)/$(APP_NAME)"
+	@echo "🔨 编译当前平台..."
+	@go build -ldflags="$(LDFLAGS)" -o $(BUILD_DIR)/$(APP_NAME) $(SRC)
+	@echo "✅ 完成!"
 
-## run: 运行项目
-run:
-	$(GOCMD) run $(MAIN_FILE) -config configs/config.yaml
+# 编译并压缩
+build-compressed: build-all
+	@echo "📦 压缩二进制文件..."
+	@command -v upx >/dev/null 2>&1 && upx -q $(BUILD_DIR)/* || echo "⚠️  UPX 未安装，跳过压缩"
 
-## test: 运行测试
-test:
-	$(GOTEST) -v -cover ./...
+# 生成校验和
+checksums:
+	@echo "🔐 生成校验和..."
+	@cd $(BUILD_DIR) && sha256sum * > checksums.txt
+	@echo "✅ 校验和已保存到 $(BUILD_DIR)/checksums.txt"
 
-## clean: 清理构建文件
+# 清理
 clean:
-	@echo "清理..."
+	@echo "🧹 清理构建文件..."
 	@rm -rf $(BUILD_DIR)
-	@$(GOCMD) clean
+	@echo "✅ 清理完成!"
 
-## deps: 安装/更新依赖
+# 运行
+run:
+	@go run $(SRC)
+
+# 测试
+test:
+	@go test -v ./...
+
+# 安装依赖
 deps:
-	$(GOMOD) download
-	$(GOMOD) tidy
-	@echo "依赖安装完成"
+	@go mod download
+	@go mod tidy
 
-## lint: 代码检查
-lint:
-	@which golangci-lint > /dev/null || (echo "安装 golangci-lint..." && go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest)
-	golangci-lint run
+# 显示信息
+info:
+	@echo "应用名称: $(APP_NAME)"
+	@echo "版本:     $(VERSION)"
+	@echo "构建时间: $(BUILD_TIME)"
+	@echo "Git提交:  $(GIT_COMMIT)"
 
-## docker: 构建Docker镜像
-docker:
-	docker build -t $(APP_NAME):$(VERSION) .
-	docker tag $(APP_NAME):$(VERSION) $(APP_NAME):latest
-
-## docker-run: 运行Docker容器
-docker-run:
-	docker run -d \
-		--name $(APP_NAME) \
-		-p 8888:8888 \
-		-p 9090:9090 \
-		--restart always \
-		$(APP_NAME):$(VERSION)
-
-## build-all: 交叉编译所有平台
-build-all:
-	@echo "编译多平台版本..."
-	@mkdir -p $(BUILD_DIR)
-	GOOS=linux GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(APP_NAME)-linux-amd64 $(MAIN_FILE)
-	GOOS=linux GOARCH=arm64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(APP_NAME)-linux-arm64 $(MAIN_FILE)
-	GOOS=windows GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(APP_NAME)-windows-amd64.exe $(MAIN_FILE)
-	GOOS=darwin GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(APP_NAME)-darwin-amd64 $(MAIN_FILE)
-	GOOS=darwin GOARCH=arm64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(APP_NAME)-darwin-arm64 $(MAIN_FILE)
-	@echo "所有平台编译完成"
-
-## install: 安装到系统
-install: build
-	@echo "安装到 /usr/local/bin/..."
-	@sudo cp $(BUILD_DIR)/$(APP_NAME) /usr/local/bin/
-	@echo "安装完成"
-
-## help: 显示帮助信息
+# 帮助
 help:
 	@echo "可用命令:"
-	@sed -n 's/^##//p' ${MAKEFILE_LIST} | column -t -s ':' | sed -e 's/^/ /'
+	@echo "  make all              - 清理并构建所有平台"
+	@echo "  make build            - 构建当前平台"
+	@echo "  make build-all        - 构建所有平台"
+	@echo "  make build-compressed - 构建并压缩"
+	@echo "  make linux/amd64      - 构建指定平台"
+	@echo "  make clean            - 清理构建文件"
+	@echo "  make run              - 运行程序"
+	@echo "  make test             - 运行测试"
+	@echo "  make checksums        - 生成校验和"
+	@echo "  make info             - 显示构建信息"

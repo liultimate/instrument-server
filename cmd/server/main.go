@@ -10,11 +10,19 @@ import (
 )
 
 var (
-    Version   = "1.0.0"
+    Version   = "dev"
     BuildTime = "unknown"
+    GitCommit = "unknown"
 )
 
 func main() {
+    // 检查是否需要显示版本
+    if len(os.Args) > 1 && os.Args[1] == "version" {
+        fmt.Printf("版本:     %s\n", Version)
+        fmt.Printf("构建时间: %s\n", BuildTime)
+        fmt.Printf("Git提交:  %s\n", GitCommit)
+        return
+    }
     // 命令行参数
     configFile := flag.String("config", "configs/config.yaml", "配置文件路径")
     showVersion := flag.Bool("version", false, "显示版本信息")
