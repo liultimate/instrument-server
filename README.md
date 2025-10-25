@@ -1,3 +1,21 @@
+# 🎼 Instrument Server
+
+[![Go Version](https://img.shields.io/badge/Go-1.19+-00ADD8?logo=go)](https://golang.org/) [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+ [![Build](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com)
+
+---
+
+ **[English](#english)** | **[中文](#chinese)**
+
+<a name="english"></a>
+## 📖 English
+High-performance TCP data gateway built with Go, providing concurrent connection handling, real-time data collection, protocol parsing and forwarding for industrial equipment and IoT sensors.
+<a name="chinese"></a>
+## 📖 中文
+基于Go语言的高性能TCP数据接入网关，提供高并发连接处理、实时数据采集、协议解析和数据转发，适用于工业设备和IoT传感器场景。
+
+---
+
 ## 一、压力测试
 
 ### 1. 基本测试（10000设备，每秒1条）
