@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  instrument-server:
+    build: .
+    image: instrument-server:latest
+    container_name: instrument-server
+    restart: always
+    ports:
+      - "8888:8888"  # TCP服务端口
+      - "9090:9090"  # Metrics端口
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      - ./configs:/app/configs:ro
+      - ./logs:/app/logs
+    depends_on:
+      - redis
+    networks:
+      - instrument-net
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 4G
+
+  redis:
+    image: redis:7-alpine
+    container_name: instrument-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - instrument-net
+
+  # 可选：Prometheus监控
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: instrument-prometheus
+    restart: always
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - instrument-net
+
+  # 可选：Grafana可视化
+  grafana:
+    image: grafana/grafana:latest
+    container_name: instrument-grafana
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - instrument-net
+
+volumes:
+  redis-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  instrument-net:
+    driver: bridge

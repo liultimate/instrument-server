@@ -1,0 +1,25 @@
+server:
+  host: "0.0.0.0"
+  port: 8888
+  max_connections: 100000
+  read_timeout: 30s
+  write_timeout: 30s
+  buffer_size: 4096
+  keep_alive: 180s
+
+redis:
+  addr: "localhost:6379"
+  password: ""
+  db: 0
+  pool_size: 100
+  channel: "instrument_data"
+
+log:
+  level: "info"  # debug, info, warn, error
+  format: "json"  # json, text
+  output: "stdout"  # stdout, file
+  file_path: "/var/log/instrument-server.log"
+
+monitor:
+  enabled: true
+  metrics_port: 9090
