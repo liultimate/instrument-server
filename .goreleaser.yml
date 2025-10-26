@@ -1,3 +1,5 @@
+version: 2
+
 project_name: instrument-server
 
 before:
@@ -5,9 +7,14 @@ before:
     - go mod tidy
     - go test ./...
 
+metadata:
+  mod_timestamp: "{{ .CommitTimestamp }}"
+
 builds:
+  - id: instrument-server-app
     main: ./cmd/server
-  - env:
+    binary: instrument-server
+    env:
       - CGO_ENABLED=0
     goos:
       - linux
@@ -16,7 +23,6 @@ builds:
     goarch:
       - amd64
       - arm64
-    # 排除某些组合
     ignore:
       - goos: windows
         goarch: arm64
@@ -25,48 +31,85 @@ builds:
       - -X main.version={{.Version}}
       - -X main.commit={{.Commit}}
       - -X main.date={{.Date}}
+      - -X main.builtBy=goreleaser
+    flags:
+      - -trimpath
+    mod_timestamp: "{{ .CommitTimestamp }}"
 
 archives:
-  - format: tar.gz
+  - id: default
     name_template: >-
       {{ .ProjectName }}_
-      {{- title .Os }}_
-      {{- if eq .Arch "amd64" }}x86_64
-      {{- else if eq .Arch "386" }}i386
-      {{- else }}{{ .Arch }}{{ end }}
-    format_overrides:
-      - goos: windows
-        format: zip
+      {{ .Version }}_
+      {{ .Os }}_
+      {{ .Arch }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
     files:
       - README.md
       - LICENSE
       - CHANGELOG.md
+      - src: "dist/CHANGELOG.md"
+        dst: "."
+        strip_parent: true
 
 checksum:
-  name_template: 'checksums.txt'
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
+  algorithm: sha256
 
 snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+  version_template: "{{ incpatch .Version }}-next"
 
 changelog:
+  use: github
   sort: asc
+  abbrev: 0
   filters:
     exclude:
-      - '^docs:'
-      - '^test:'
-      - '^chore:'
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+      - "Merge pull request"
+      - "Merge remote-tracking branch"
+      - "Merge branch"
+  groups:
+    - title: "New Features"
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: "Bug Fixes"
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: "Performance Improvements"
+      regexp: '^.*?perf(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: "Documentation"
+      regexp: '^.*?docs?(\([[:word:]]+\))??!?:.+$'
+      order: 3
+    - title: "Others"
+      order: 999
 
 release:
   github:
-    owner: username
-    name: repo-name
+    owner: liultimate
+    name: instrument-server
   draft: false
+  replace_existing_draft: true
+  target_commitish: "{{ .Commit }}"
   prerelease: auto
-  name_template: "{{.ProjectName}}-v{{.Version}}"
-
-# 发布到 GitHub Packages
-# 注意：GoReleaser Pro 功能
-# brews:
-#   - repository:
-#       owner: username
-#       name: homebrew-tap
+  mode: append
+  name_template: "{{ .ProjectName }} v{{ .Version }}"
+  header: |
+    ## 🎉 Release {{ .Version }}
+    
+    ### Installation
+    
+    Download the appropriate binary for your platform below.
+    
+  footer: |
+    ---
+    
+    ### Checksums
+    
+    Verify your download:
+    ```bash
+    sha256sum -c {{ .ProjectName }}_{{ .Version }}_checksums.txt
