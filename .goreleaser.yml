@@ -6,9 +6,7 @@ before:
     - go test ./...
 
 builds:
-  - id: instrument-server
     main: ./cmd/server
-    binary: instrument-server
   - env:
       - CGO_ENABLED=0
     goos:
